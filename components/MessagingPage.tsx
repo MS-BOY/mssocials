@@ -4,10 +4,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Send, Smile, Paperclip, Mic, Sparkles, Activity, ShieldCheck, 
   Home, LayoutGrid, Plus, MessageCircle, User as UserIcon,
-  Camera, Image as ImageIcon, Heart, Info, Phone, Video, Play, ArrowUpRight, Loader2, Globe
+  Camera, Image as ImageIcon, Heart, Info, Phone, Video, Play, ArrowUpRight, Loader2, Globe,
+  MoreVertical, Edit3, Trash2, X as CloseIcon
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, subscribeToMessages, sendMessage, subscribeToConversation } from '../services/firebase';
+import { db, subscribeToMessages, sendMessage, subscribeToConversation, deleteMessage, updateMessage } from '../services/firebase';
 import type { User } from "../services/firebase";
 import { Message, Conversation, ContentItem, ContentType } from '../types';
 
@@ -118,6 +119,8 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -132,10 +135,10 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
   }, [id]);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && !editingMessage) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, editingMessage]);
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -143,24 +146,43 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
     
     setIsSending(true);
     const text = inputText;
-    setInputText("");
     
     try {
-      await sendMessage(id, user.uid, text);
+      if (editingMessage) {
+        await updateMessage(id, editingMessage.id, text);
+        setEditingMessage(null);
+      } else {
+        await sendMessage(id, user.uid, text);
+      }
+      setInputText("");
     } catch (err) {
-      console.error("Signal transmission error:", err);
-      setInputText(text); 
-      alert("Transmission failed. Neural link unstable.");
+      console.error("Signal modulation error:", err);
+      alert("Neural sync error. Retry packet.");
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleDelete = async (msgId: string) => {
+    if (!id) return;
+    try {
+      await deleteMessage(id, msgId);
+      setActiveMenuId(null);
+    } catch (err) {
+      alert("Dissolution failed.");
+    }
+  };
+
+  const startEdit = (msg: Message) => {
+    setEditingMessage(msg);
+    setInputText(msg.text);
+    setActiveMenuId(null);
   };
 
   const partnerUid = conversation?.participants?.find(p => p !== user?.uid);
   const partnerName = partnerUid ? (conversation.participantNames[partnerUid] || 'OPERATOR') : 'OPERATOR';
   const partnerAvatar = partnerUid ? conversation.participantAvatars[partnerUid] : '';
 
-  // Improved regex for dynamic detection
   const postLinkRegex = /(?:#\/post\/|post:|\/post\/)([a-zA-Z0-9_-]{15,})/g;
 
   return (
@@ -202,8 +224,6 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
       <div ref={scrollRef} className="w-full max-w-3xl flex-grow overflow-y-auto no-scrollbar px-6 space-y-6 py-12 relative z-10">
         {messages.map((m, i) => {
           const isMe = m.senderId === user?.uid;
-          
-          // Dynamically find all IDs in the message
           const matches = Array.from(m.text.matchAll(postLinkRegex));
           const postIds = matches.map(match => match[1]);
 
@@ -214,73 +234,112 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                   <img src={partnerAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${m.senderId}`} className="w-full h-full object-cover" alt="" />
                 </div>
               )}
-              <div 
-                className={`relative group max-w-[90%] sm:max-w-[75%] p-4 px-6 rounded-[2rem] transition-all duration-300 border shadow-2xl ${
-                  isMe 
-                    ? 'bg-[#00FFFF]/5 border-[#00FFFF]/20 text-white rounded-br-md' 
-                    : 'bg-[#161616] border-white/5 text-white/90 rounded-bl-md'
-                }`}
-              >
-                <p className="text-sm sm:text-base font-medium leading-relaxed tracking-tight whitespace-pre-wrap selection:bg-[#00FFFF]/30">{m.text}</p>
-                
-                {/* Dynamic Preview List */}
-                {postIds.map(postId => (
-                  <PostPreviewCard 
-                    key={postId} 
-                    postId={postId} 
-                    initialData={items.find(p => p.id === postId)} 
-                  />
-                ))}
+              
+              <div className={`relative group max-w-[90%] sm:max-w-[75%] transition-all duration-300`}>
+                <div 
+                  className={`relative p-4 px-6 rounded-[2rem] border shadow-2xl ${
+                    isMe 
+                      ? 'bg-[#00FFFF]/5 border-[#00FFFF]/20 text-white rounded-br-md' 
+                      : 'bg-[#161616] border-white/5 text-white/90 rounded-bl-md'
+                  }`}
+                >
+                  <p className="text-sm sm:text-base font-medium leading-relaxed tracking-tight whitespace-pre-wrap selection:bg-[#00FFFF]/30">
+                    {m.text}
+                  </p>
+                  
+                  {postIds.map(postId => (
+                    <PostPreviewCard 
+                      key={postId} 
+                      postId={postId} 
+                      initialData={items.find(p => p.id === postId)} 
+                    />
+                  ))}
 
-                <div className={`mt-3 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                   <span className="text-[7px] font-black text-white/20 uppercase tracking-[0.2em]">
-                    {m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TRANSMITTING...'}
-                  </span>
-                  {isMe && (
-                    <div className="flex items-center gap-1">
-                      <ShieldCheck size={9} className="text-[#00FFFF]/40" />
-                      <span className="text-[6px] font-black text-[#00FFFF]/30 uppercase">Neural Verify</span>
+                  <div className={`mt-3 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[7px] font-black text-white/20 uppercase tracking-[0.2em]">
+                        {m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'SYNCING...'}
+                      </span>
+                      {(m as any).isEdited && (
+                        <span className="text-[6px] font-black text-[#00FFFF]/40 uppercase italic tracking-widest">(MODULATED)</span>
+                      )}
                     </div>
-                  )}
+                    {isMe && (
+                      <div className="flex items-center gap-1">
+                        <ShieldCheck size={9} className="text-[#00FFFF]/40" />
+                        <span className="text-[6px] font-black text-[#00FFFF]/30 uppercase">Neural Verify</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Context Menu Trigger */}
+                {isMe && (
+                  <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all">
+                    <button 
+                      onClick={() => setActiveMenuId(activeMenuId === m.id ? null : m.id)}
+                      className="p-2 text-white/20 hover:text-[#00FFFF]"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    
+                    {activeMenuId === m.id && (
+                      <div className="absolute right-full mr-2 bottom-0 w-32 ss-glass rounded-2xl p-1.5 border border-white/10 z-[100] animate-in slide-in-from-right-2 duration-300">
+                        <button 
+                          onClick={() => startEdit(m)}
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 rounded-xl text-[10px] font-black text-white uppercase tracking-widest group/item transition-all"
+                        >
+                          Modulate <Edit3 size={12} className="text-[#00FFFF]" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(m.id)}
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-rose-500/10 rounded-xl text-[10px] font-black text-rose-500 uppercase tracking-widest transition-all"
+                        >
+                          Dissolve <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center py-44">
-             <div className="relative mb-8">
-                <div className="absolute inset-0 bg-[#00FFFF] blur-[100px] opacity-10 animate-pulse"></div>
-                <MessageCircle size={80} className="text-white opacity-10 relative z-10" />
-             </div>
-             <h2 className="text-lg font-black text-white uppercase tracking-[0.5em] italic opacity-20">Secure Node Ready</h2>
-          </div>
-        )}
       </div>
 
       <div className="fixed bottom-6 left-6 right-6 z-[200] flex justify-center">
         <form 
           onSubmit={handleSend}
-          className="w-full max-w-4xl flex items-center gap-3 bg-[#161616]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-2 pl-3 shadow-4xl group transition-all focus-within:border-[#00FFFF]/20"
+          className={`w-full max-w-4xl flex items-center gap-3 bg-[#161616]/90 backdrop-blur-2xl border rounded-[2.5rem] p-2 pl-3 shadow-4xl group transition-all ${editingMessage ? 'border-[#00FFFF]/40 ring-1 ring-[#00FFFF]/20' : 'border-white/10'}`}
         >
           <div className="flex items-center">
-             <button type="button" className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center hover:bg-[#00FFFF] hover:scale-105 active:scale-95 transition-all shadow-xl">
-               <Camera size={20} strokeWidth={2.5} />
+             <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xl ${editingMessage ? 'bg-[#00FFFF] text-black' : 'bg-white text-black hover:bg-[#00FFFF]'}`}>
+               {editingMessage ? <Edit3 size={20} /> : <Camera size={20} strokeWidth={2.5} />}
              </button>
           </div>
 
-          <div className="flex-grow flex items-center">
+          <div className="flex-grow flex items-center relative">
             <input 
+              autoFocus={!!editingMessage}
               type="text" 
               value={inputText} 
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Inject signal thought..."
+              placeholder={editingMessage ? "Modulating packet..." : "Inject signal thought..."}
               className="flex-grow bg-transparent border-none text-sm sm:text-base font-bold text-white placeholder-white/10 focus:ring-0 outline-none px-2"
             />
+            {editingMessage && (
+              <button 
+                type="button"
+                onClick={() => { setEditingMessage(null); setInputText(""); }}
+                className="absolute right-2 p-2 text-rose-500 hover:text-white transition-all"
+              >
+                <CloseIcon size={16} />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 pr-2">
-            {!inputText.trim() ? (
+            {!inputText.trim() && !editingMessage ? (
               <>
                 <button type="button" className="p-2 text-white/20 hover:text-white transition-all"><Mic size={22} /></button>
                 <button type="button" className="p-2 text-white/20 hover:text-white transition-all"><ImageIcon size={22} /></button>
@@ -293,7 +352,7 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                 disabled={isSending}
                 className="px-6 py-3 text-[#00FFFF] font-black text-[11px] uppercase tracking-[0.2em] hover:scale-110 active:scale-95 transition-all disabled:opacity-30"
               >
-                {isSending ? <Loader2 size={16} className="animate-spin" /> : "Sync"}
+                {isSending ? <Loader2 size={16} className="animate-spin" /> : editingMessage ? "UPDATE" : "Sync"}
               </button>
             )}
           </div>
@@ -302,6 +361,12 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        .ss-glass {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
       `}</style>
     </div>
   );
