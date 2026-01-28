@@ -21,7 +21,7 @@ const PostPreviewCard: React.FC<{ postId: string; initialData?: ContentItem }> =
   useEffect(() => {
     if (post) return;
 
-    const fetchPost = async () => {
+    const fetchPost = sync () => {
       try {
         const postRef = doc(db, "posts", postId);
         const postSnap = await getDoc(postRef);
