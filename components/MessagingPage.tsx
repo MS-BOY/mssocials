@@ -118,9 +118,17 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
     }
   };
 
-  const partnerUid = conversation?.participants?.find(p => p !== user?.uid);
-  const partnerName = partnerUid ? conversation?.participantNames[partnerUid] : "OPERATOR";
-  const partnerAvatar = partnerUid ? conversation?.participantAvatars[partnerUid] : "";
+  /* ---------- FIXED PARTNER DATA (IMPORTANT) ---------- */
+
+  const partnerUid =
+    conversation?.participants?.find(p => p !== user?.uid) || "";
+
+  const partnerName =
+    conversation?.participantNames?.[partnerUid] || "OPERATOR";
+
+  const partnerAvatar =
+    conversation?.participantAvatars?.[partnerUid] ||
+    `https://api.dicebear.com/7.x/identicon/svg?seed=${partnerUid || id}`;
 
   const postRegex = /(?:\/post\/|post:)([a-zA-Z0-9_-]{15,})/g;
 
@@ -131,13 +139,28 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
       <div className="fixed top-0 left-0 right-0 h-20 bg-black/70 backdrop-blur border-b border-white/5 flex items-center z-50">
         <div className="max-w-5xl mx-auto w-full px-6 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)}><ArrowLeft /></button>
-            <img src={partnerAvatar} className="w-10 h-10 rounded-full" />
+            <button onClick={() => navigate(-1)}>
+              <ArrowLeft />
+            </button>
+
+            <img
+              src={partnerAvatar}
+              alt="Profile"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src =
+                  `https://api.dicebear.com/7.x/identicon/svg?seed=fallback`;
+              }}
+              className="w-10 h-10 rounded-full object-cover border border-white/10"
+            />
+
             <div>
-              <h1 className="text-white font-bold">{partnerName}</h1>
+              <h1 className="text-white font-bold">
+                {conversation ? partnerName : "Loading..."}
+              </h1>
               <p className="text-xs text-cyan-400">SYNC ESTABLISHED</p>
             </div>
           </div>
+
           <div className="flex gap-4 text-white/40">
             <Phone />
             <Video />
@@ -158,7 +181,11 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                 <p className="text-white whitespace-pre-wrap">{m.text}</p>
 
                 {postIds.map(pid => (
-                  <PostPreviewCard key={pid} postId={pid} initialData={items.find(p => p.id === pid)} />
+                  <PostPreviewCard
+                    key={pid}
+                    postId={pid}
+                    initialData={items.find(p => p.id === pid)}
+                  />
                 ))}
 
                 {isMe && (
@@ -180,7 +207,6 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
             <Camera />
           </button>
 
-          {/* 🔥 FIXED FORM */}
           <form onSubmit={handleSend} className="flex-grow flex items-center gap-2">
             <input
               value={inputText}
