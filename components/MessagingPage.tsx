@@ -259,15 +259,17 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
       </div>
 
       <div className="fixed bottom-6 left-6 right-6 z-[200] flex justify-center">
-        <div className="w-full max-w-4xl flex items-center gap-3 bg-[#161616]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-2 pl-3 shadow-4xl group transition-all focus-within:border-[#00FFFF]/20">
-          
+        <form 
+          onSubmit={handleSend}
+          className="w-full max-w-4xl flex items-center gap-3 bg-[#161616]/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-2 pl-3 shadow-4xl group transition-all focus-within:border-[#00FFFF]/20"
+        >
           <div className="flex items-center">
-             <button className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center hover:bg-[#00FFFF] hover:scale-105 active:scale-95 transition-all shadow-xl">
+             <button type="button" className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center hover:bg-[#00FFFF] hover:scale-105 active:scale-95 transition-all shadow-xl">
                <Camera size={20} strokeWidth={2.5} />
              </button>
           </div>
 
-          <form onSubmit={handleSend} className="flex-grow flex items-center">
+          <div className="flex-grow flex items-center">
             <input 
               type="text" 
               value={inputText} 
@@ -275,7 +277,7 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
               placeholder="Inject signal thought..."
               className="flex-grow bg-transparent border-none text-sm sm:text-base font-bold text-white placeholder-white/10 focus:ring-0 outline-none px-2"
             />
-          </form>
+          </div>
 
           <div className="flex items-center gap-1 sm:gap-2 pr-2">
             {!inputText.trim() ? (
@@ -295,7 +297,7 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
               </button>
             )}
           </div>
-        </div>
+        </form>
       </div>
 
       <style>{`
