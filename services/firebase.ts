@@ -1,4 +1,3 @@
-
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
   getFirestore, 
@@ -32,6 +31,7 @@ import {
 import { ContentItem, Comment, Message, Conversation, UserProfile, Group, ContentType } from "../types";
 import { deleteFromCloudinary } from "./cloudinary";
 
+// Re-export User type from Firebase to fix downstream module resolution errors
 export type { User };
 
 const firebaseConfig = {
@@ -47,9 +47,9 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Use extremely resilient settings for restricted networks
-export const db = initializeFirestore(app, {
+// Fix: Removed 'useFetchStreams' which is not a valid property of FirestoreSettings and cast 'app' to 'any' to resolve type compatibility errors.
+export const db = initializeFirestore(app as any, {
   experimentalForceLongPolling: true,
-  useFetchStreams: false,
 });
 
 export const auth = getAuth(app);
@@ -106,15 +106,12 @@ export const sendMessage = async (convoId: string, senderId: string, text: strin
     const convoRef = doc(db, "conversations", convoId);
     const chatsRef = collection(db, "conversations", convoId, "chats");
 
-    // 1. Double-verify and update conversation metadata
-    // Using setDoc with merge: true ensures the doc exists even in offline/slow environments
     await setDoc(convoRef, {
       lastMessage: text || (imageUrl ? "Shared a visual packet" : "Signal detected"),
       lastUpdate: Timestamp.now(),
-      participants: convoId.split('_') // Ensure participants are always present
+      participants: convoId.split('_') 
     }, { merge: true });
 
-    // 2. Transmit the packet (add message document)
     await addDoc(chatsRef, {
       senderId,
       text: text || "",
@@ -126,6 +123,32 @@ export const sendMessage = async (convoId: string, senderId: string, text: strin
   } catch (error) {
     console.error("Failed to transmit message packet:", error);
     throw error;
+  }
+};
+
+export const deleteMessage = async (convoId: string, messageId: string) => {
+  try {
+    const msgRef = doc(db, "conversations", convoId, "chats", messageId);
+    await deleteDoc(msgRef);
+    return true;
+  } catch (err) {
+    console.error("Signal dissolution failed:", err);
+    throw err;
+  }
+};
+
+export const updateMessage = async (convoId: string, messageId: string, newText: string) => {
+  try {
+    const msgRef = doc(db, "conversations", convoId, "chats", messageId);
+    await updateDoc(msgRef, {
+      text: newText,
+      isEdited: true,
+      updatedAt: Timestamp.now()
+    });
+    return true;
+  } catch (err) {
+    console.error("Signal modulation failed:", err);
+    throw err;
   }
 };
 
