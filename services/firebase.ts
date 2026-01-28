@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
   getFirestore, 
@@ -47,7 +48,6 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Use extremely resilient settings for restricted networks
-// Fix: Removed 'useFetchStreams' which is not a valid property of FirestoreSettings and cast 'app' to 'any' to resolve type compatibility errors.
 export const db = initializeFirestore(app as any, {
   experimentalForceLongPolling: true,
 });
@@ -289,6 +289,27 @@ export const deletePost = async (id: string) => {
 
 export const toggleLike = async (postId: string, userId: string, isLiked: boolean) => { return updateDoc(doc(db, "posts", postId), { likedBy: isLiked ? arrayRemove(userId) : arrayUnion(userId), likes: increment(isLiked ? -1 : 1) }); };
 export const addCommentToPost = async (postId: string, comment: any) => { const postRef = doc(db, "posts", postId); const newComment = { ...comment, id: Math.random().toString(36).substr(2, 9), createdAt: Timestamp.now() }; return updateDoc(postRef, { comments: arrayUnion(newComment) }); };
+
+export const deleteCommentFromPost = async (postId: string, commentId: string) => {
+  const postRef = doc(db, "posts", postId);
+  const snap = await getDoc(postRef);
+  if (!snap.exists()) return;
+  const data = snap.data() as ContentItem;
+  const updatedComments = (data.comments || []).filter(c => c.id !== commentId);
+  return updateDoc(postRef, { comments: updatedComments });
+};
+
+export const updateCommentInPost = async (postId: string, commentId: string, newText: string) => {
+  const postRef = doc(db, "posts", postId);
+  const snap = await getDoc(postRef);
+  if (!snap.exists()) return;
+  const data = snap.data() as ContentItem;
+  const updatedComments = (data.comments || []).map(c => 
+    c.id === commentId ? { ...c, text: newText, isEdited: true, updatedAt: Timestamp.now() } : c
+  );
+  return updateDoc(postRef, { comments: updatedComments });
+};
+
 export const toggleFollow = async (currentUid: string, targetUid: string, isFollowing: boolean) => { const currentUserRef = doc(db, "users", currentUid); const targetUserRef = doc(db, "users", targetUid); if (isFollowing) { await updateDoc(currentUserRef, { following: arrayRemove(targetUid) }); await updateDoc(targetUserRef, { followers: arrayRemove(currentUid) }); } else { await updateDoc(currentUserRef, { following: arrayUnion(targetUid) }); await updateDoc(targetUserRef, { followers: arrayUnion(currentUid) }); } };
 
 export const createAIPost = async (user: User, postData: { title: string, description: string, category: string, imageUrl?: string }) => {
