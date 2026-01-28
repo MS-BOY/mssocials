@@ -164,7 +164,7 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
   };
 
   const handleDelete = async (msgId: string) => {
-    if (!id) return;
+    if (!id || !window.confirm("Dissolve this signal transmission from the timeline?")) return;
     try {
       await deleteMessage(id, msgId);
       setActiveMenuId(null);
@@ -242,6 +242,7 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                       ? 'bg-[#00FFFF]/5 border-[#00FFFF]/20 text-white rounded-br-md' 
                       : 'bg-[#161616] border-white/5 text-white/90 rounded-bl-md'
                   }`}
+                  onClick={() => isMe && !activeMenuId && setActiveMenuId(m.id)}
                 >
                   <p className="text-sm sm:text-base font-medium leading-relaxed tracking-tight whitespace-pre-wrap selection:bg-[#00FFFF]/30">
                     {m.text}
@@ -255,12 +256,12 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                     />
                   ))}
 
-                  <div className={`mt-3 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`mt-3 flex items-center justify-between opacity-0 sm:group-hover:opacity-100 transition-opacity duration-500 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-[7px] font-black text-white/20 uppercase tracking-[0.2em]">
                         {m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'SYNCING...'}
                       </span>
-                      {(m as any).isEdited && (
+                      {m.isEdited && (
                         <span className="text-[6px] font-black text-[#00FFFF]/40 uppercase italic tracking-widest">(MODULATED)</span>
                       )}
                     </div>
@@ -275,9 +276,9 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
 
                 {/* Context Menu Trigger */}
                 {isMe && (
-                  <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="absolute -left-10 top-1/2 -translate-y-1/2 hidden sm:block opacity-0 group-hover:opacity-100 transition-all">
                     <button 
-                      onClick={() => setActiveMenuId(activeMenuId === m.id ? null : m.id)}
+                      onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === m.id ? null : m.id); }}
                       className="p-2 text-white/20 hover:text-[#00FFFF]"
                     >
                       <MoreVertical size={18} />
@@ -286,13 +287,13 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                     {activeMenuId === m.id && (
                       <div className="absolute right-full mr-2 bottom-0 w-32 ss-glass rounded-2xl p-1.5 border border-white/10 z-[100] animate-in slide-in-from-right-2 duration-300">
                         <button 
-                          onClick={() => startEdit(m)}
+                          onClick={(e) => { e.stopPropagation(); startEdit(m); }}
                           className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 rounded-xl text-[10px] font-black text-white uppercase tracking-widest group/item transition-all"
                         >
                           Modulate <Edit3 size={12} className="text-[#00FFFF]" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(m.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}
                           className="w-full flex items-center justify-between px-3 py-2 hover:bg-rose-500/10 rounded-xl text-[10px] font-black text-rose-500 uppercase tracking-widest transition-all"
                         >
                           Dissolve <Trash2 size={12} />
@@ -300,6 +301,33 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
                       </div>
                     )}
                   </div>
+                )}
+                
+                {/* Mobile Menu Overlay */}
+                {isMe && activeMenuId === m.id && (
+                   <div className="fixed inset-0 z-[1000] sm:hidden flex items-center justify-center p-6" onClick={() => setActiveMenuId(null)}>
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+                      <div className="relative w-full max-w-xs ss-glass rounded-[2.5rem] p-4 space-y-2 border border-white/10 animate-in zoom-in-95 duration-300">
+                         <button 
+                          onClick={(e) => { e.stopPropagation(); startEdit(m); }}
+                          className="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl text-xs font-black text-white uppercase tracking-widest"
+                        >
+                          Modulate Signal <Edit3 size={18} className="text-[#00FFFF]" />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}
+                          className="w-full flex items-center justify-between p-6 bg-rose-500/10 rounded-3xl text-xs font-black text-rose-500 uppercase tracking-widest"
+                        >
+                          Dissolve Link <Trash2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => setActiveMenuId(null)}
+                          className="w-full p-4 text-[10px] font-black text-white/30 uppercase tracking-widest"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                   </div>
                 )}
               </div>
             </div>
