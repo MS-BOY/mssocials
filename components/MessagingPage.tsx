@@ -1,37 +1,93 @@
-import React, { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Phone, Video, Info, Mic, Image as ImageIcon,
-  Plus, Heart, Loader2, ShieldCheck, MessageCircle
-} from "lucide-react";
-import {
-  subscribeToMessages,
-  subscribeToConversation,
-  sendMessage,
-  deleteMessage,
-  editMessage
-} from "../services/firebase";
+  ArrowLeft, Phone, Video, Info, MessageCircle, Camera,
+  Mic, Image as ImageIcon, Plus, Heart, Loader2, ShieldCheck,
+  Play, ArrowUpRight, Globe
+} from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, subscribeToMessages, sendMessage, subscribeToConversation } from '../services/firebase';
 import type { User } from "../services/firebase";
-import { Message, Conversation, ContentItem } from "../types";
+import { Message, Conversation, ContentItem, ContentType } from '../types';
 
-const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ user }) => {
+/* ---------------- POST PREVIEW CARD ---------------- */
+
+const PostPreviewCard: React.FC<{ postId: string; initialData?: ContentItem }> = ({ postId, initialData }) => {
+  const navigate = useNavigate();
+  const [post, setPost] = useState<ContentItem | null>(initialData || null);
+  const [loading, setLoading] = useState(!initialData);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (post) return;
+
+    const fetchPost = async () => {
+      try {
+        const snap = await getDoc(doc(db, "posts", postId));
+        if (snap.exists()) {
+          setPost({ id: snap.id, ...snap.data() } as ContentItem);
+        } else setError(true);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPost();
+  }, [postId, post]);
+
+  if (error) return null;
+
+  if (loading || !post) {
+    return (
+      <div className="mt-4 w-full max-w-[320px] bg-[#121212] border border-white/5 rounded-2xl p-4 animate-pulse">
+        <div className="h-20 bg-white/5 rounded-xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
+      className="mt-4 max-w-[340px] bg-[#121212] border border-white/10 rounded-2xl overflow-hidden cursor-pointer hover:border-cyan-400/40 transition-all"
+    >
+      <div className="relative aspect-video bg-black">
+        <img src={post.thumbnail} className="w-full h-full object-cover" />
+        {post.type === ContentType.VIDEO && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Play className="text-white" />
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 bg-[#181818]">
+        <h4 className="text-sm font-bold text-white">{post.title}</h4>
+        <p className="text-xs text-white/50 line-clamp-2">{post.excerpt}</p>
+
+        <div className="mt-3 flex justify-between items-center text-[9px] text-white/30">
+          <div className="flex items-center gap-1">
+            <Globe size={10} /> SIGNAL-STREAM
+          </div>
+          <ArrowUpRight size={12} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ---------------- MESSAGING PAGE ---------------- */
+
+const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ user, items }) => {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
-
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
-
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  /* ---------------- SUBSCRIPTIONS ---------------- */
 
   useEffect(() => {
     if (!id) return;
@@ -41,29 +97,19 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
   }, [id]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth"
-    });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
-
-  /* ---------------- SEND ---------------- */
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!user || !id || !inputText.trim() || isSending) return;
 
-    setIsSending(true);
     const text = inputText;
     setInputText("");
+    setIsSending(true);
 
     try {
-      await sendMessage(id, user.uid, text, {
-        replyTo: replyTo
-          ? { id: replyTo.id, text: replyTo.text }
-          : null
-      });
-      setReplyTo(null);
+      await sendMessage(id, user.uid, text);
     } catch {
       setInputText(text);
       alert("Message failed");
@@ -72,23 +118,21 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
     }
   };
 
-  /* ---------------- HEADER DATA ---------------- */
-
   const partnerUid = conversation?.participants?.find(p => p !== user?.uid);
-  const partnerName = partnerUid
-    ? conversation?.participantNames[partnerUid]
-    : "OPERATOR";
+  const partnerName = partnerUid ? conversation?.participantNames[partnerUid] : "OPERATOR";
+  const partnerAvatar = partnerUid ? conversation?.participantAvatars[partnerUid] : "";
 
-  /* ---------------- UI ---------------- */
+  const postRegex = /(?:\/post\/|post:)([a-zA-Z0-9_-]{15,})/g;
 
   return (
     <div className="min-h-screen bg-black pt-24 pb-36">
 
       {/* HEADER */}
-      <div className="fixed top-0 left-0 right-0 h-20 bg-black/70 backdrop-blur border-b border-white/5 z-50 flex items-center">
+      <div className="fixed top-0 left-0 right-0 h-20 bg-black/70 backdrop-blur border-b border-white/5 flex items-center z-50">
         <div className="max-w-5xl mx-auto w-full px-6 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate(-1)}><ArrowLeft /></button>
+            <img src={partnerAvatar} className="w-10 h-10 rounded-full" />
             <div>
               <h1 className="text-white font-bold">{partnerName}</h1>
               <p className="text-xs text-cyan-400">SYNC ESTABLISHED</p>
@@ -103,90 +147,22 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
       </div>
 
       {/* MESSAGES */}
-      <div ref={scrollRef} className="max-w-3xl mx-auto px-6 space-y-6">
-        {messages.length === 0 && (
-          <div className="h-96 flex flex-col justify-center items-center text-white/20">
-            <MessageCircle size={64} />
-            <p className="mt-4">Secure channel ready</p>
-          </div>
-        )}
-
-        {messages.map((m) => {
+      <div ref={scrollRef} className="max-w-3xl mx-auto px-6 space-y-6 overflow-y-auto">
+        {messages.map((m, i) => {
           const isMe = m.senderId === user?.uid;
+          const postIds = [...m.text.matchAll(postRegex)].map(m => m[1]);
 
           return (
-            <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-              <div className={`group max-w-[75%] rounded-3xl p-4 ${
-                isMe ? "bg-cyan-400/10" : "bg-white/5"
-              }`}>
+            <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div className={`p-4 rounded-3xl max-w-[75%] ${isMe ? 'bg-cyan-400/10' : 'bg-white/5'}`}>
+                <p className="text-white whitespace-pre-wrap">{m.text}</p>
 
-                {/* REPLY PREVIEW */}
-                {m.replyTo && (
-                  <div className="mb-2 p-2 rounded bg-black/30 text-xs text-cyan-300">
-                    Replying to: {m.replyTo.text}
-                  </div>
-                )}
+                {postIds.map(pid => (
+                  <PostPreviewCard key={pid} postId={pid} initialData={items.find(p => p.id === pid)} />
+                ))}
 
-                {/* EDIT MODE */}
-                {editingId === m.id ? (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      await editMessage(id!, m.id, editText);
-                      setEditingId(null);
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      className="flex-grow bg-black/30 text-white px-2 rounded"
-                    />
-                    <button className="text-cyan-400 text-sm">Save</button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(null)}
-                      className="text-white/40 text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    <p className="text-white whitespace-pre-wrap">{m.text}</p>
-                    {m.edited && (
-                      <span className="text-[9px] text-white/30 italic">(edited)</span>
-                    )}
-                  </>
-                )}
-
-                {/* ACTIONS */}
-                {isMe && editingId !== m.id && (
-                  <div className="flex gap-4 mt-2 text-[10px] text-white/40 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => {
-                      setEditingId(m.id);
-                      setEditText(m.text);
-                    }}>
-                      Edit
-                    </button>
-
-                    <button onClick={() => {
-                      if (confirm("Delete this message?")) {
-                        deleteMessage(id!, m.id);
-                      }
-                    }}>
-                      Delete
-                    </button>
-
-                    <button onClick={() => setReplyTo(m)}>
-                      Reply
-                    </button>
-                  </div>
-                )}
-
-                {/* VERIFIED */}
                 {isMe && (
-                  <div className="mt-1 flex items-center gap-1 text-[9px] text-cyan-400/40">
+                  <div className="mt-2 flex items-center gap-1 text-[10px] text-cyan-400/40">
                     <ShieldCheck size={10} /> Verified
                   </div>
                 )}
@@ -200,19 +176,11 @@ const MessagingPage: React.FC<{ user: User | null; items: ContentItem[] }> = ({ 
       <div className="fixed bottom-6 left-6 right-6 flex justify-center">
         <div className="w-full max-w-4xl bg-[#161616] border border-white/10 rounded-full p-2 flex items-center gap-3">
 
-          {/* REPLY BANNER */}
-          {replyTo && (
-            <div className="absolute -top-12 left-4 right-4 bg-black/80 p-2 rounded-xl text-xs text-white/70">
-              Replying to: {replyTo.text.slice(0, 60)}
-              <button
-                onClick={() => setReplyTo(null)}
-                className="ml-3 text-red-400"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          <button className="w-11 h-11 bg-white text-black rounded-full flex items-center justify-center">
+            <Camera />
+          </button>
 
+          {/* 🔥 FIXED FORM */}
           <form onSubmit={handleSend} className="flex-grow flex items-center gap-2">
             <input
               value={inputText}
