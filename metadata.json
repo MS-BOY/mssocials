@@ -1,7 +1,7 @@
 {
-  "name": "Signal Stream",
-  "short_name": "Signal Stream",
-  "description": "Futuristic galaxy-orbit social networking platform.",
+  "name": "MS Social",
+  "short_name": "MS",
+  "description": "social networking platform.",
   "projectId": "6975e0641196e915035516e5",
   "requestFramePermissions": [
     "camera",
