@@ -100,7 +100,7 @@ const PostPreviewCard: React.FC<{ postId: string; initialData?: ContentItem }> =
               <div className="w-5 h-5 rounded-md bg-[#00FFFF]/10 flex items-center justify-center border border-[#00FFFF]/20">
                 <Globe size={11} className="text-[#00FFFF]" />
               </div>
-              <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.1em]">SIGNAL-STREAM.NET</span>
+              <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.1em]">MSSOCIALS.VERCEL.APP</span>
             </div>
             <div className="flex items-center gap-1.5">
                <span className="text-[8px] font-black text-[#00FFFF] opacity-0 group-hover/preview:opacity-100 transition-opacity tracking-widest">OPEN LINK</span>
