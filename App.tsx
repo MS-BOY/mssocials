@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import OrbitFeed from './components/OrbitFeed';
 import MobileFeed from './components/MobileFeed';
@@ -14,8 +14,39 @@ import ContentDetail from './components/ContentDetail';
 import ProfilePage from './components/ProfilePage';
 import BottomNav from './components/BottomNav';
 import LoungeRoom from './components/LoungeRoom';
+import GroupPage from './components/GroupPage';
 import { ContentItem } from './types';
 import { subscribeToPosts, subscribeToAuthChanges, User } from './services/firebase';
+
+const SEOManager: React.FC<{ items: ContentItem[] }> = ({ items }) => {
+  const location = useLocation();
+  const params = useParams();
+
+  useEffect(() => {
+    let title = "Signal Stream | Neural Social Nexus";
+    let description = "Join the future of neural social networking in the Signal Stream galaxy.";
+
+    if (location.pathname === '/') {
+      title = "Home | Signal Stream Feed";
+    } else if (location.pathname.startsWith('/post/')) {
+      const post = items.find(i => i.id === params.id);
+      if (post) {
+        title = `${post.title} | Signal Stream`;
+        description = post.excerpt;
+      }
+    } else if (location.pathname.startsWith('/profile/')) {
+      title = "Operator Profile | Signal Stream";
+    } else if (location.pathname.startsWith('/group/')) {
+      title = "Cluster Hub | Signal Stream";
+    }
+
+    document.title = title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', description);
+  }, [location, params, items]);
+
+  return null;
+};
 
 const SplashScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   useEffect(() => {
@@ -56,12 +87,14 @@ const Layout: React.FC<{
   setEditingItem: (item: ContentItem) => void;
   setCommentingItemId: (id: string) => void;
   isMobile: boolean;
-}> = ({ user, items, onOpenSearch, onOpenCreate, onOpenMessages, setEditingItem, setCommentingItemId, isMobile }) => {
+  handleOpenMessages: (initialMsg?: string) => void;
+}> = ({ user, items, onOpenSearch, onOpenCreate, onOpenMessages, setEditingItem, setCommentingItemId, isMobile, handleOpenMessages }) => {
   const location = useLocation();
   const isHomePage = location.pathname === '/';
 
   return (
     <div className="min-h-screen text-white font-inter bg-transparent relative flex flex-col overflow-hidden">
+      <SEOManager items={items} />
       <Header 
         user={user} 
         onOpenSearch={onOpenSearch}
@@ -89,10 +122,19 @@ const Layout: React.FC<{
               user={user} 
               onEdit={(i) => { setEditingItem(i); onOpenCreate(); }} 
               onOpenComments={(item) => setCommentingItemId(item.id)}
-              onStartMessage={(msg) => onOpenMessages(msg)}
+              onStartMessage={() => handleOpenMessages()}
             />
           } />
           <Route path="/messages/:id" element={<MessagingPage user={user} items={items} />} />
+          <Route path="/group/:id" element={
+            <GroupPage 
+              user={user} 
+              onEdit={(i) => { setEditingItem(i); onOpenCreate(); }}
+              onOpenComments={(item) => setCommentingItemId(item.id)}
+              onStartMessage={(target) => handleOpenMessages()}
+              onOpenMessages={onOpenMessages}
+            />
+          } />
           <Route path="/lounge/:id" element={<LoungeRoom user={user} />} />
           <Route path="/profile/:uid" element={
             <ProfilePage 
@@ -100,7 +142,7 @@ const Layout: React.FC<{
               currentUser={user}
               onEdit={(i) => { setEditingItem(i); onOpenCreate(); }}
               onOpenComments={(item) => setCommentingItemId(item.id)}
-              onStartMessage={(msg) => onOpenMessages(msg)}
+              onStartMessage={() => handleOpenMessages()}
             />
           } />
         </Routes>
@@ -173,6 +215,7 @@ const App: React.FC = () => {
         onOpenMessages={handleOpenMessages}
         setEditingItem={setEditingItem}
         setCommentingItemId={setCommentingItemId}
+        handleOpenMessages={handleOpenMessages}
       />
 
       {isPostModalOpen && (
@@ -188,7 +231,7 @@ const App: React.FC = () => {
         <SearchPanel 
           currentUser={user} 
           onClose={() => setIsSearchOpen(false)} 
-          onStartMessage={(target, initialMsg) => handleOpenMessages(initialMsg)} 
+          onStartMessage={(target) => handleOpenMessages()} 
         />
       )}
 
